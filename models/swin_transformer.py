@@ -535,7 +535,16 @@ class SwinTransformer(nn.Module):
 
         self.norm = norm_layer(self.num_features)
         self.avgpool = nn.AdaptiveAvgPool1d(1)
-        self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
+        if isinstance(num_classes, int):
+            self.head = nn.Linear(self.num_features, num_classes) if num_classes > 0 else nn.Identity()
+            self.ds_num = 1
+        elif isinstance(num_classes, list):
+            ds_num = len(num_classes[1:])
+            self.ds_num = ds_num
+            for i in range(ds_num):
+                n_cls = num_classes[i + 1] - num_classes[i]
+                head = nn.Linear(self.num_features, n_cls)
+                setattr(self, "head" + str(i), head)
 
         self.apply(self._init_weights)
 
@@ -570,9 +579,18 @@ class SwinTransformer(nn.Module):
         x = torch.flatten(x, 1)
         return x
 
-    def forward(self, x):
+    def forward(self, x, mode="train", head_index=-1):
         x = self.forward_features(x)
-        x = self.head(x)
+        if mode == "train":
+            if hasattr(self, "head"):
+                x = self.head(x)
+        elif mode == "val":
+            if hasattr(self, "head"):
+                x = self.head(x)
+            elif head_index >= 0:
+                head = getattr(self, "head" + str(head_index))
+                x = head(x)
+
         return x
 
     def flops(self):
@@ -581,5 +599,5 @@ class SwinTransformer(nn.Module):
         for i, layer in enumerate(self.layers):
             flops += layer.flops()
         flops += self.num_features * self.patches_resolution[0] * self.patches_resolution[1] // (2 ** self.num_layers)
-        flops += self.num_features * self.num_classes
+        flops += self.num_features * (self.num_classes[-1] if isinstance(self.num_classes, list) else self.num_classes)
         return flops

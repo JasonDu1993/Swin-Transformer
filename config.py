@@ -18,12 +18,50 @@ _C.BASE = ['']
 # Data settings
 # -----------------------------------------------------------------------------
 _C.DATA = CN()
-# Batch size for a single GPU, could be overwritten by command line argument
-_C.DATA.BATCH_SIZE = 128
-# Path to dataset, could be overwritten by command line argument
-_C.DATA.DATA_PATH = ''
-# Dataset name
+# # Batch size for a single GPU, could be overwritten by command line argument
+_C.DATA.BATCH_SIZE = 16
+# # Path to dataset, could be overwritten by command line argument
+_C.DATA.DATA_PATH = "/zhouyafei/image_recog_data/ImageNet21k/"
+# # Dataset name
 _C.DATA.DATASET = 'imagenet'
+# _C.DATA.DATASET = 'cifar10'
+# multi dataset
+_C.DATA.DATA_ROOTS = [
+    "/zhouyafei/image_recog_data/semi-inat-2021",
+    "/zhouyafei/image_recog_data/AliProducts/",
+    "/zhouyafei/image_recog_data/食材/ISIA_Food500/dataset/ISIA_Food500/images",
+    "/zhouyafei/image_recog_data/ImageNet21k/",
+]
+_C.DATA.DATA_PATHS = [
+    "/zhouyafei/image_recog_data/semi-inat-2021/labels/train.txt",
+    "/zhouyafei/workspace/goods/data/train_0_49980.txt",
+    "/dataset/dataset/image_recog_data/food/ISIA_Food500/dataset/train_test_list/seen_train.txt",
+    "/zhouyafei/image_recog_data/ImageNet21k/labels/train.txt",
+]
+# _C.DATA.BATCH_SIZES = 16
+
+_C.DATA.VAL = CN()
+_C.DATA.VAL.CLASSFIER_INDEXS = [0, 1, 2, 3]  # 测试集在_C.DATA.DATA_ROOTS中index，从0开始
+_C.DATA.VAL.DATA_ROOTS = [
+    "/zhouyafei/image_recog_data/semi-inat-2021",
+    "/zhouyafei/image_recog_data/AliProducts/",
+    "/zhouyafei/image_recog_data/食材/ISIA_Food500/dataset/ISIA_Food500/images",
+    "/zhouyafei/image_recog_data/ImageNet21k/",
+]
+_C.DATA.VAL.DATA_PATHS = [
+    "/zhouyafei/image_recog_data/semi-inat-2021/labels/val.txt",
+    "/zhouyafei/image_recog_data/AliProducts/val_0_49980.txt",
+    "/dataset/dataset/image_recog_data/food/ISIA_Food500/dataset/train_test_list/seen_test.txt",
+    "/zhouyafei/image_recog_data/ImageNet21k/labels/val.same.txt",
+]
+_C.DATA.VAL.SINGLE_DATA_ROOTS = [
+    "/zhouyafei/image_recog_data/ImageNet21k/",
+]
+_C.DATA.VAL.SINGLE_DATA_PATHS = [
+    "/zhouyafei/image_recog_data/ImageNet21k/labels/val.same.txt",
+]
+_C.DATA.VAL.BATCH_SIZE = 64
+
 # Input image size
 _C.DATA.IMG_SIZE = 224
 # Interpolation to resize image (random, bilinear, bicubic)
@@ -36,7 +74,7 @@ _C.DATA.CACHE_MODE = 'part'
 # Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.
 _C.DATA.PIN_MEMORY = True
 # Number of data loading threads
-_C.DATA.NUM_WORKERS = 8
+_C.DATA.NUM_WORKERS = 4
 
 # -----------------------------------------------------------------------------
 # Model settings
@@ -52,7 +90,7 @@ _C.MODEL.PRETRAINED = ''
 # Checkpoint to resume, could be overwritten by command line argument
 _C.MODEL.RESUME = ''
 # Number of classes, overwritten in data preparation
-_C.MODEL.NUM_CLASSES = 1000
+_C.MODEL.NUM_CLASSES = 1000  # list for multidata
 # Dropout rate
 _C.MODEL.DROP_RATE = 0.0
 # Drop path rate
@@ -179,7 +217,7 @@ _C.PRINT_FREQ = 10
 # Fixed random seed
 _C.SEED = 0
 # Perform evaluation only, overwritten by command line argument
-_C.EVAL_MODE = False
+_C.EVAL_MODE = ""
 # Test throughput only, overwritten by command line argument
 _C.THROUGHPUT_MODE = False
 # local rank for DistributedDataParallel, given by command line argument
@@ -211,6 +249,7 @@ def update_config(config, args):
     # merge from specific arguments
     if args.batch_size:
         config.DATA.BATCH_SIZE = args.batch_size
+        config.DATA.VAL.BATCH_SIZE = args.batch_size
     if args.data_path:
         config.DATA.DATA_PATH = args.data_path
     if args.zip:
@@ -232,12 +271,25 @@ def update_config(config, args):
     if args.tag:
         config.TAG = args.tag
     if args.eval:
-        config.EVAL_MODE = True
+        config.EVAL_MODE = args.eval
     if args.throughput:
         config.THROUGHPUT_MODE = True
+    # if args.epochs:
+    #     config.TRAIN.EPOCHS = args.epochs
+    # if args.base_lr:
+    #     config.TRAIN.BASE_LR = args.base_lr
+    # if args.warmup_epochs:
+    #     config.TRAIN.WARMUP_EPOCHS = args.warmup_epochs
+    # if args.warmup_lr:
+    #     config.TRAIN.WARMUP_LR = args.warmup_lr
+    # if args.weight_decay:
+    #     config.TRAIN.WEIGHT_DECAY = args.weight_decay
+    # if args.lr_scheduler:
+    #     config.TRAIN.LR_SCHEDULER.NAME = args.lr_scheduler
 
     # set local rank for distributed training
     config.LOCAL_RANK = args.local_rank
+    config.debug = args.debug
 
     # output folder
     config.OUTPUT = os.path.join(config.OUTPUT, config.MODEL.NAME, config.TAG)
