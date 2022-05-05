@@ -29,7 +29,7 @@ _C.DATA.DATASET = 'imagenet'
 _C.DATA.DATA_ROOTS = [
     "/zhouyafei/image_recog_data/semi-inat-2021",
     "/zhouyafei/image_recog_data/AliProducts/",
-    "/zhouyafei/image_recog_data/食材/ISIA_Food500/dataset/ISIA_Food500/images",
+    "/dataset/dataset/image_recog_data/food/ISIA_Food500/dataset/ISIA_Food500/images",
     "/zhouyafei/image_recog_data/ImageNet21k/",
 ]
 _C.DATA.DATA_PATHS = [
@@ -45,7 +45,7 @@ _C.DATA.VAL.CLASSFIER_INDEXS = [0, 1, 2, 3]  # 测试集在_C.DATA.DATA_ROOTS中
 _C.DATA.VAL.DATA_ROOTS = [
     "/zhouyafei/image_recog_data/semi-inat-2021",
     "/zhouyafei/image_recog_data/AliProducts/",
-    "/zhouyafei/image_recog_data/食材/ISIA_Food500/dataset/ISIA_Food500/images",
+    "/dataset/dataset/image_recog_data/food/ISIA_Food500/dataset/ISIA_Food500/images",
     "/zhouyafei/image_recog_data/ImageNet21k/",
 ]
 _C.DATA.VAL.DATA_PATHS = [
@@ -145,6 +145,7 @@ _C.TRAIN.ACCUMULATION_STEPS = 0
 # Whether to use gradient checkpointing to save memory
 # could be overwritten by command line argument
 _C.TRAIN.USE_CHECKPOINT = False
+_C.TRAIN.FREEZE_EPOCH = -1  # 从0开始，FREEZE_EPOCH表示0~FREEZE_EPOCH(包含该周期)将被冻结，负数表示不冻结
 
 # LR scheduler
 _C.TRAIN.LR_SCHEDULER = CN()
@@ -226,7 +227,7 @@ _C.LOCAL_RANK = 0
 
 def _update_config_from_file(config, cfg_file):
     config.defrost()
-    with open(cfg_file, 'r') as f:
+    with open(cfg_file, 'r', encoding="utf-8") as f:
         yaml_cfg = yaml.load(f, Loader=yaml.FullLoader)
 
     for cfg in yaml_cfg.setdefault('BASE', ['']):

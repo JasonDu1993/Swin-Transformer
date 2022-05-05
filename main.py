@@ -21,12 +21,14 @@ from timm.utils import accuracy
 
 from config import get_config
 from models import build_model
-from data import build_loader, build_loader_for_multi_dataset, build_val_loader
+from data import build_loader_for_multi_dataset, build_val_loader
 from lr_scheduler import build_scheduler
 from optimizer import build_optimizer
 from logger import create_logger
-from utils import load_checkpoint, load_pretrained, save_checkpoint, get_grad_norm, auto_resume_helper, reduce_tensor
-from viewer import viewer
+from utils.utils import load_checkpoint, load_pretrained, save_checkpoint, get_grad_norm, auto_resume_helper, \
+    reduce_tensor
+from utils.freeze_layer import set_unfreeze_by_names, unfreeze_all
+from utils.viewer import viewer
 
 try:
     # noinspection PyUnresolvedReferences
@@ -114,6 +116,8 @@ def main(config):
     model = build_model(config)
     model.cuda()
     # logger.info(str(model))
+    if config.MODEL.PRETRAINED:
+        set_unfreeze_by_names(model, ["head"], unfreeze=True)
     if not config.EVAL_MODE:
         optimizer = build_optimizer(config, model)
         if config.AMP_OPT_LEVEL != "O0":
@@ -157,13 +161,15 @@ def main(config):
             config.MODEL.RESUME = resume_file
             config.freeze()
             logger.info(f'auto resuming from {resume_file}')
+            logger.info(f'AUTO_RESUME load_checkpoint from {resume_file}')
+            load_checkpoint(config, model_without_ddp, optimizer, lr_scheduler, logger)
         else:
             logger.info(f'no checkpoint found in {config.OUTPUT}, ignoring auto resume')
 
     if config.MODEL.PRETRAINED and (not config.MODEL.RESUME):
         load_pretrained(config, model_without_ddp, logger)
-        acc1, acc5, loss = validate(config, data_loader_val, model)
-        logger.info(f"Accuracy of the network on the {len(dataset_val)} test images: {acc1:.1f}%")
+        # acc1, acc5, loss = validate(config, data_loader_val, model)
+        # logger.info(f"Accuracy of the network on the {len(dataset_val)} test images: {acc1:.1f}%")
 
     if config.THROUGHPUT_MODE:
         throughput(data_loader_val, model, logger)
@@ -172,16 +178,18 @@ def main(config):
     logger.info("Start training")
     start_time = time.time()
     for epoch in range(config.TRAIN.START_EPOCH, config.TRAIN.EPOCHS):
+        if epoch > config.TRAIN.FREEZE_EPOCH:
+            unfreeze_all(model)
         data_loader_train.sampler.set_epoch(epoch)
 
         train_one_epoch(config, model, criterion, data_loader_train, optimizer, epoch, mixup_fn, lr_scheduler)
         if dist.get_rank() == 0 and (epoch % config.SAVE_FREQ == 0 or epoch == (config.TRAIN.EPOCHS - 1)):
             save_checkpoint(config, epoch, model_without_ddp, max_accuracy, optimizer, lr_scheduler, logger)
 
-        # acc1, acc5, loss = validate(config, data_loader_val, model)
-        # logger.info(f"Accuracy of the network on the {len(dataset_val)} test images: {acc1:.1f}%")
-        # max_accuracy = max(max_accuracy, acc1)
-        # logger.info(f'Max accuracy: {max_accuracy:.2f}%')
+        acc1, acc5, loss = validate(config, data_loader_val, model, epoch)
+        logger.info(f"Accuracy of the network on the {len(dataset_val)} test images: {acc1:.1f}%")
+        max_accuracy = max(max_accuracy, acc1)
+        logger.info(f'Max accuracy: {max_accuracy:.2f}%')
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
@@ -196,9 +204,8 @@ def train_one_epoch(config, model, criterion, data_loader, optimizer, epoch, mix
     batch_time = AverageMeter()
     loss_meter = AverageMeter()
     norm_meter = AverageMeter()
-
-    start = time.time()
-    end = time.time()
+    start_time = time.time()
+    end_time = time.time()
     for idx, (samples, targets) in enumerate(data_loader):
         samples = samples.cuda(non_blocking=True)
         targets = targets.cuda(non_blocking=True)
@@ -283,8 +290,8 @@ def train_one_epoch(config, model, criterion, data_loader, optimizer, epoch, mix
 
         loss_meter.update(loss.item(), targets.size(0))
         norm_meter.update(grad_norm)
-        batch_time.update(time.time() - end)
-        end = time.time()
+        batch_time.update(time.time() - end_time)
+        end_time = time.time()
 
         loss_str_total = ""
         for i, l in enumerate(loss_total):
@@ -316,12 +323,12 @@ def train_one_epoch(config, model, criterion, data_loader, optimizer, epoch, mix
             loss_meter.reset()
             norm_meter.reset()
             batch_time.reset()
-    epoch_time = time.time() - start
+    epoch_time = time.time() - start_time
     logger.info(f"EPOCH {epoch} training takes {datetime.timedelta(seconds=int(epoch_time))}")
 
 
 @torch.no_grad()
-def validate(config, data_loader, model):
+def validate(config, data_loader, model, epoch=-1):
     criterion = torch.nn.CrossEntropyLoss()
     model.eval()
     loss_meter_total = AverageMeter()
@@ -378,6 +385,9 @@ def validate(config, data_loader, model):
         acc1_meter_total.update(acc1_meter.avg)
         acc5_meter_total.update(acc5_meter.avg)
         loss_meter_total.update(loss_meter.avg)
+        if epoch >= 0:
+            viewer.add_scalar("acc1_" + str(i), acc1_meter.avg, epoch)
+            viewer.add_scalar("acc5_" + str(i), acc5_meter.avg, epoch)
         res_str = "{:.3f}/{:.3f}".format(acc1_meter.avg, acc5_meter.avg)
         result.append(res_str)
     logger.info(" |".join(result))
@@ -455,7 +465,6 @@ if __name__ == '__main__':
         with open(path, "w") as f:
             f.write(config.dump())
         logger.info(f"Full config saved to {path}")
-        from torch.utils.tensorboard import SummaryWriter
 
         log_dir = os.path.join(config.OUTPUT, "log")
         viewer.init_tensorboard(log_dir)

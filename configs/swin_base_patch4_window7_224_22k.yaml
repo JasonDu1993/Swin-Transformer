@@ -11,13 +11,14 @@ MODEL:
     WINDOW_SIZE: 7
 TRAIN:
   EPOCHS: 90
-#  WARMUP_EPOCHS: 5
+  #  WARMUP_EPOCHS: 5
   WARMUP_EPOCHS: 6
   WEIGHT_DECAY: 0.05
-#  BASE_LR: 1.25e-4 # 4096 batch-size
+  #  BASE_LR: 1.25e-4 # 4096 batch-size
   BASE_LR: 5e-5 # 4096 batch-size
-#  WARMUP_LR: 1.25e-7
+  #  WARMUP_LR: 1.25e-7
   WARMUP_LR: 5e-8
-#  MIN_LR: 1.25e-6
+  #  MIN_LR: 1.25e-6
   MIN_LR: 5e-7
   CLIP_GRAD: 0.5
+TAG: "20220414a"

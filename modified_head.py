@@ -10,7 +10,7 @@ from main import parse_option
 from data.build import build_transform
 from data.image_list import ImageListDataset
 import torch.utils.data
-from utils import load_checkpoint
+from utils.utils import load_checkpoint
 
 if __name__ == '__main__':
     config = parse_option()

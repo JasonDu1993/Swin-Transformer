@@ -105,6 +105,8 @@ def load_pretrained(config, model, logger):
                 state_dict[k] = absolute_pos_embed_pretrained_resized
 
     # check classifier, if not match, then re-init classifier to zero
+    if not hasattr(model, "head"):
+        return
     head_bias_pretrained = state_dict['head.bias']
     Nc1 = head_bias_pretrained.shape[0]
     Nc2 = model.head.bias.shape[0]

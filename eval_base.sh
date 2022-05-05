@@ -1,2 +1,2 @@
 CUDA_VISIBLE_DEVICES=4,5,6,7 python -m torch.distributed.launch --nproc_per_node 4 --master_port 12346  main.py --eval multi\
-  --cfg configs/swin_base_patch4_window7_224_22k.yaml  --resume /zhoudu/workspaces/Swin-Transformer/output/swin_base_patch4_window7_224_22k/20220414a/ckpt_epoch_59.pth --batch-size 128
+  --cfg configs/swin_base_patch4_window7_224_22k.yaml  --resume /zhoudu/workspaces/Swin-Transformer/output/swin_base_patch4_window7_224_22k/20220414a/ckpt_epoch_89.pth --batch-size 128
